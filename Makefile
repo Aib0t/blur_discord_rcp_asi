@@ -1,0 +1,1 @@
+ "C:\Program Files (x86)\mingw-w64\i686-8.1.0-win32-dwarf-rt_v6-rev0\mingw32\bin\i686-w64-mingw32-g++.exe" -static-libgcc -static-libstdc++ -mthreads -I src\ -I include\ -L lib\ -l discord-rpc -shared -o build\blur_rpc.asi src\blur_rpc.cpp
