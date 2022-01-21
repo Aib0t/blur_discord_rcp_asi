@@ -1,6 +1,5 @@
 #include <ctime> // time() func
-#include <string>
-#include <vadefs.h>
+//#include <string>
 //#include <inttypes.h>
 //#include <stdint.h>
 //#include <vadefs.h>
@@ -68,6 +67,7 @@ int get_rp_state() {
 	int rp_state = -1;
 	uintptr_t ptr = follow_offsets(ADDY_BLUR_STATE, OFFSETS_BLUR_STATE);
 	if (ptr != NULL) rp_state = *(uintptr_t*) ptr;
+	else log("follow_offsets(ADDY_BLUR_STATE, OFFSETS_BLUR_STATE) returned NULL");
 	return rp_state;
 }
 
@@ -75,7 +75,7 @@ int get_rp_state() {
 void format_details(int rp_state, char* sz_details, const size_t len) {
 	switch (rp_state) {
 		case BLUR_STATE_MAIN:
-			sprintf_s(sz_details, len, "(Main menu)");
+			sprintf_s(sz_details, len, "Main menu");
 			break;
 
 		case BLUR_STATE_MENU_MAIN: // what?
@@ -98,13 +98,14 @@ void format_details(int rp_state, char* sz_details, const size_t len) {
 			sprintf_s(sz_details, len, "Garage");
 			break;
 
-		//
+		// 6 ?
+
 		case BLUR_STATE_SINGLEPLAYER:
 			sprintf_s(sz_details, len, "Singleplayer");
 			break;
 
 		case BLUR_STATE_PHOTOS:
-			sprintf_s(sz_details, len, "Photos (singleplayer)");
+			sprintf_s(sz_details, len, "Photos");
 			break;
 
 		case BLUR_STATE_CHALLENGES_FRIENDS:
@@ -115,20 +116,24 @@ void format_details(int rp_state, char* sz_details, const size_t len) {
 			sprintf_s(sz_details, len, "Career");
 			break;
 
-		//
+		case BLUR_STATE_CAREER_MENU:
+			sprintf_s(sz_details, len, "Career");
+			break;
 
 		case BLUR_STATE_MENU_MULTIPLAYER:
 			sprintf_s(sz_details, len, "Multiplayer menu");
 			break;
 
-		//
+		case BLUR_STATE_SPLITSCREEN:
+			sprintf_s(sz_details, len, "Splitscreen");
+			break;
 
 		case BLUR_STATE_MENU_HISTORY:
 			sprintf_s(sz_details, len, "Race history");
 			break;
 
 		case BLUR_STATE_MENU_LAN:
-			sprintf_s(sz_details, len, "In LAN menu");
+			sprintf_s(sz_details, len, "Playing on LAN");
 			break;
 
 		case BLUR_STATE_MENU_ONLINE:
@@ -147,7 +152,24 @@ void format_details(int rp_state, char* sz_details, const size_t len) {
 			sprintf_s(sz_details, len, "In online lobby");
 			break;
 
-		//..
+		case BLUR_STATE_SINGLEPLAYER_ONE_ON_ONE:
+			//sprintf_s(sz_details, len, "Singleplayer: One-on-One");
+			sprintf_s(sz_details, len, "Singleplayer");
+			break;
+		case BLUR_STATE_SINGLEPLAYER_RACE:
+			//sprintf_s(sz_details, len, "Singleplayer: Race");
+			sprintf_s(sz_details, len, "Singleplayer");
+			break;
+		case BLUR_STATE_SINGLEPLAYER_DESTRUCTION:
+			//sprintf_s(sz_details, len, "Singleplayer: Destruction");
+			sprintf_s(sz_details, len, "Singleplayer");
+			break;
+		case BLUR_STATE_SINGLEPLAYER_CHECKPOINT:
+			//sprintf_s(sz_details, len, "Singleplayer: Checkpoint");
+			sprintf_s(sz_details, len, "Singleplayer");
+			break;
+
+		// 24..26 ?
 
 		case BLUR_STATE_RACE:
 			sprintf_s(sz_details, len, "In race");
@@ -169,7 +191,6 @@ void format_details(int rp_state, char* sz_details, const size_t len) {
 
 
 void format_state(int rp_state, char* sz_playlist, const size_t len_playlist, char* sz_small_img_key, const size_t len_small_img_key) {
-	unsigned int playlist_id = BLUR_PLAYLIST_NONE;
 	/*
 	if (rp_state == BLUR_STATE_ONLINE_LOBBY) {
 		//playlist_id = *(unsigned int*) ADDY_BLUR_PLAYLIST_ONLINE;
@@ -179,87 +200,112 @@ void format_state(int rp_state, char* sz_playlist, const size_t len_playlist, ch
 		//playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST_PRIVATE, OFFSETS_BLUR_PLAYLIST_PRIVATE);
 	*/
 	if ((rp_state == BLUR_STATE_ONLINE_LOBBY) || (rp_state == BLUR_STATE_PRIVATE_LOBBY)) {
-		//playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST_PRIVATE, OFFSETS_BLUR_PLAYLIST_PRIVATE);
+		unsigned int playlist_id = BLUR_PLAYLIST_NONE;
 		uintptr_t ptr = follow_offsets(ADDY_BLUR_PLAYLIST, OFFSETS_BLUR_PLAYLIST); //TODO NOTE: for me, this one is [always] correct (?)
 		if (ptr != NULL) playlist_id = *(unsigned int*) ptr;
-	}
-	switch (playlist_id) {
-		case BLUR_PLAYLIST_COMMUNITY_EVENTS:
-			sprintf_s(sz_playlist, len_playlist, "Community Events");
-			sprintf_s(sz_small_img_key, len_small_img_key, "community_events");
-			break;
+		else log("follow_offsets(ADDY_BLUR_PLAYLIST) returned NULL");
+		switch (playlist_id) {
+			case BLUR_PLAYLIST_COMMUNITY_EVENTS:
+				sprintf_s(sz_playlist, len_playlist, "Community Events");
+				sprintf_s(sz_small_img_key, len_small_img_key, "community_events");
+				break;
 
-		case BLUR_PLAYLIST_TEAM_RACING:
-			sprintf_s(sz_playlist, len_playlist, "Team Racing");
-			sprintf_s(sz_small_img_key, len_small_img_key, "team_racing");
-			break;
+			case BLUR_PLAYLIST_TEAM_RACING:
+				sprintf_s(sz_playlist, len_playlist, "Team Racing");
+				sprintf_s(sz_small_img_key, len_small_img_key, "team_racing");
+				break;
 
-		case BLUR_PLAYLIST_TEAM_MOTOR_MASH:
-			sprintf_s(sz_playlist, len_playlist, "Team Motor Mash");
-			sprintf_s(sz_small_img_key, len_small_img_key, "team_motor_mash");
-			break;
+			case BLUR_PLAYLIST_TEAM_MOTOR_MASH:
+				sprintf_s(sz_playlist, len_playlist, "Team Motor Mash");
+				sprintf_s(sz_small_img_key, len_small_img_key, "team_motor_mash");
+				break;
 
-		case BLUR_PLAYLIST_MOTOR_MASH:
-			sprintf_s(sz_playlist, len_playlist, "Motor mash");
-			sprintf_s(sz_small_img_key, len_small_img_key, "motor_mash");
-			break;
+			case BLUR_PLAYLIST_MOTOR_MASH:
+				sprintf_s(sz_playlist, len_playlist, "Motor mash");
+				sprintf_s(sz_small_img_key, len_small_img_key, "motor_mash");
+				break;
 
-		case BLUR_PLAYLIST_WORLD_TOUR:
-			sprintf_s(sz_playlist, len_playlist, "World Tour");
-			sprintf_s(sz_small_img_key, len_small_img_key, "world_tour");
-			break;
+			case BLUR_PLAYLIST_WORLD_TOUR:
+				sprintf_s(sz_playlist, len_playlist, "World Tour");
+				sprintf_s(sz_small_img_key, len_small_img_key, "world_tour");
+				break;
 
-		case BLUR_PLAYLIST_HARDCORE:
-			sprintf_s(sz_playlist, len_playlist, "Hardcore Racing");
-			sprintf_s(sz_small_img_key, len_small_img_key, "hardcore");
-			break;
+			case BLUR_PLAYLIST_HARDCORE:
+				sprintf_s(sz_playlist, len_playlist, "Hardcore Racing");
+				sprintf_s(sz_small_img_key, len_small_img_key, "hardcore");
+				break;
 
-		case BLUR_PLAYLIST_POWERED_UP_RACING:
-			sprintf_s(sz_playlist, len_playlist, "Powered-up racing");
-			sprintf_s(sz_small_img_key, len_small_img_key, "powered_up_racing");
-			break;
+			case BLUR_PLAYLIST_POWERED_UP_RACING:
+				sprintf_s(sz_playlist, len_playlist, "Powered-up racing");
+				sprintf_s(sz_small_img_key, len_small_img_key, "powered_up_racing");
+				break;
 
-		case BLUR_PLAYLIST_SKIRMISH_RACING:
-			sprintf_s(sz_playlist, len_playlist, "Skirmish racing");
-			sprintf_s(sz_small_img_key, len_small_img_key, "skirmish_racing");
-			break;
+			case BLUR_PLAYLIST_SKIRMISH_RACING:
+				sprintf_s(sz_playlist, len_playlist, "Skirmish racing");
+				sprintf_s(sz_small_img_key, len_small_img_key, "skirmish_racing");
+				break;
 
-		case BLUR_PLAYLIST_DRIVING_SCHOOL:
-			sprintf_s(sz_playlist, len_playlist, "Driving school");
-			sprintf_s(sz_small_img_key, len_small_img_key, "driving_school");
-			break;
+			case BLUR_PLAYLIST_DRIVING_SCHOOL:
+				sprintf_s(sz_playlist, len_playlist, "Driving school");
+				sprintf_s(sz_small_img_key, len_small_img_key, "driving_school");
+				break;
 
-		case BLUR_PLAYLIST_CUSTOM_GAME:
-			sprintf_s(sz_playlist, len_playlist, "Custom game");
-			sprintf_s(sz_small_img_key, len_small_img_key, "custom_game");
-			break;
+			case BLUR_PLAYLIST_CUSTOM_GAME:
+				sprintf_s(sz_playlist, len_playlist, "Custom game");
+				sprintf_s(sz_small_img_key, len_small_img_key, "custom_game");
+				break;
 
-		case BLUR_PLAYLIST_NONE: // prob means we didnt read a playlist_id
-			sprintf_s(sz_playlist, len_playlist, "");
-			sprintf_s(sz_small_img_key, len_small_img_key, "");
-			break;
+			case BLUR_PLAYLIST_NONE: // prob means we didnt read a playlist_id
+				sprintf_s(sz_playlist, len_playlist, "");
+				sprintf_s(sz_small_img_key, len_small_img_key, "");
+				break;
 
-		default:
-			sprintf_s(sz_playlist, len_playlist, "Unknown game type: %d", playlist_id);
-			break;
+			default:
+				sprintf_s(sz_playlist, len_playlist, "Unknown playlist: %d", playlist_id);
+				break;
+		}
+	} else {
+		switch (rp_state) {
+			case BLUR_STATE_SINGLEPLAYER_ONE_ON_ONE:
+				sprintf_s(sz_playlist, len_playlist, "One-on-One");
+				sprintf_s(sz_small_img_key, len_small_img_key, "icon_event_one_on_one");
+				break;
+			case BLUR_STATE_SINGLEPLAYER_RACE:
+				sprintf_s(sz_playlist, len_playlist, "Racing");
+				sprintf_s(sz_small_img_key, len_small_img_key, "icon_event_race");
+				break;
+			case BLUR_STATE_SINGLEPLAYER_DESTRUCTION:
+				sprintf_s(sz_playlist, len_playlist, "Destruction");
+				sprintf_s(sz_small_img_key, len_small_img_key, "icon_event_destruction");
+				break;
+			case BLUR_STATE_SINGLEPLAYER_CHECKPOINT:
+				sprintf_s(sz_playlist, len_playlist, "Checkpoint");
+				sprintf_s(sz_small_img_key, len_small_img_key, "icon_event_checkpoint");
+				break;
+
+			default: // there is nothing that this rp_state should express in details...
+				sprintf_s(sz_playlist, len_playlist, "");
+				break;
+		}
 	}
 }
 
 void format_party(int rp_state, char* party_size, char* party_max, char* sz_party_id, const size_t len_party_id) {
 	// sprintf_s(partyId, length, "12222222");
-	// *partyMax = 20;
-	// *partySize = 1;
 	//FIXME changed offsets, revise on other clients
 	// TODO revise!
-	*party_max = 8; // changed to 8 cause thats what the ingame menu menu says...
+	*party_size = 0;
+	*party_max = 0;
 	// find lan values maybe?
 	if (rp_state == BLUR_STATE_ONLINE_LOBBY) {
 		uintptr_t ptr = follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_ONLINE);
 		if (ptr != NULL) *party_max = *(short*) ptr;
+		else log("follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_ONLINE) returned NULL");
 		sprintf_s(sz_party_id, len_party_id, "party_id_BLUR_STATE_ONLINE_LOBBY");
 	} else if (rp_state == BLUR_STATE_PRIVATE_LOBBY) {
 		uintptr_t ptr = follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
 		if (ptr != NULL) *party_max = *(short*) ptr;
+		else log("follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE) returned NULL");
 		//*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS_PRIVATE, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
 		sprintf_s(sz_party_id, len_party_id, "party_id_BLUR_STATE_PRIVATE_LOBBY");
 	} else {
@@ -272,6 +318,7 @@ void format_party(int rp_state, char* party_size, char* party_max, char* sz_part
 	//works when user is actually in party. (even if solo party @ 1/8)
 	uintptr_t ptr = follow_offsets(ADDY_BLUR_PARTY_N_PLAYERS, OFFSETS_BLUR_PARTY_N_PLAYERS);
 	if (ptr != NULL) *party_size = *(char*) ptr;
+	else log("follow_offsets(ADDY_BLUR_PARTY_N_PLAYERS, OFFSETS_BLUR_PARTY_N_PLAYERS) returned NULL");
 	//*party_size = 0; //still need to test this one
 }
 
@@ -290,13 +337,21 @@ void format_time(int rp_state, int64_t* start_time) {
 			// we just entered this race or something, we can display the amount of time that the user has been racing
 			*start_time = time(0);
 
-		} else if (rp_state == BLUR_STATE_CAREER) {
-			// we could come up with other things that we might want to display elapsed time for?
+		} else if ((rp_state == BLUR_STATE_SINGLEPLAYER_ONE_ON_ONE)
+				|| (rp_state == BLUR_STATE_SINGLEPLAYER_RACE)
+				|| (rp_state == BLUR_STATE_SINGLEPLAYER_DESTRUCTION)
+				|| (rp_state == BLUR_STATE_SINGLEPLAYER_CHECKPOINT)) {
+			// we just entered this singleplayer ace or something, we can display the amount of time that the user has been racing
 			*start_time = time(0);
+		} else if (rp_state == BLUR_STATE_SPLITSCREEN) { // meh
+			*start_time = 0; // nothing, dont display, cause this would display total time spent in splitscreen, just the current not race time -_-
+			//TODO FIXME
+			//*start_time = time(0);
 		} else {
+			// we could come up with other things that we might want to display elapsed time for?
 			*start_time = 0; // nothing, dont display
 		}
-		log("rp_state: " + std::to_string(prev_state) + " -> " + std::to_string(rp_state) + " @ " + std::to_string(*start_time));
+		log("prev_state != rp_state: " + std::to_string(prev_state) + " -> " + std::to_string(rp_state) + " @ " + std::to_string(*start_time));
 	}
 	prev_state = rp_state;
 }
@@ -330,7 +385,7 @@ static DWORD WINAPI ThreadEntry(LPVOID lpParam) {
 		Sleep(UPD_INTVL);
 		if ((rp_state = get_rp_state()) != -1) {
 			format_details(rp_state, sz_details, sizeof(sz_details)); // What is the user doing? (Menu / Race / Career / ... )
-			format_state(rp_state, sz_playlist, sizeof(sz_playlist), sz_small_img_key, sizeof(sz_small_img_key)); // What playlist is the user playing? (Skirmish / Team / ... )
+			format_state(rp_state, sz_playlist, sizeof(sz_playlist), sz_small_img_key, sizeof(sz_small_img_key)); // What playlist is the user playing? (Skirmish / Team / ... ) // (Destruction / Checkpoint / ... )
 			format_party(rp_state, &party_size, &party_max, party_id, sizeof(party_id)); // How many other players? ( <party> / 20 )
 			format_time(rp_state, &start_time); // How long has the user been doing that?
 
