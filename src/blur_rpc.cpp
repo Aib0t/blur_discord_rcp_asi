@@ -1,5 +1,6 @@
 #include <ctime> // time() func
 #include <string>
+#include <vadefs.h>
 //#include <inttypes.h>
 //#include <stdint.h>
 //#include <vadefs.h>
@@ -42,7 +43,7 @@ static void format_state (char* state, char length) {
 // lil logger to debug some errors, maybe RM later
 void log(std::string output) {
 	static std::ofstream log_file("blur_rpc.log");
-	log_file << output << std::endl;
+	log_file << std::to_string(time(0)).append(": ") << output << std::endl;
 	log_file.flush();
 	//OutputDebugString(output.c_str());
 }
@@ -56,6 +57,7 @@ uintptr_t follow_offsets(uintptr_t ptr_start, std::vector<uintptr_t> offsets) {
 	for (uintptr_t offset : offsets) {
 		if (addr == NULL) break; // The most basic of checks, but might save us from a few segfaults :: TODO fantastik chek
 		addr = *(uintptr_t*) addr; // TODO consider checking if we are reading some bad mem here?
+		if (addr == NULL) break; // The most basic of checks, but might save us from a few segfaults :: TODO fantastik chek
 		addr += offset;
 	}
 	return addr;
@@ -167,7 +169,7 @@ void format_details(int rp_state, char* sz_details, const size_t len) {
 
 
 void format_state(int rp_state, char* sz_playlist, const size_t len_playlist, char* sz_small_img_key, const size_t len_small_img_key) {
-	unsigned int playlist_id = 1;
+	unsigned int playlist_id = BLUR_PLAYLIST_NONE;
 	/*
 	if (rp_state == BLUR_STATE_ONLINE_LOBBY) {
 		//playlist_id = *(unsigned int*) ADDY_BLUR_PLAYLIST_ONLINE;
@@ -178,11 +180,8 @@ void format_state(int rp_state, char* sz_playlist, const size_t len_playlist, ch
 	*/
 	if ((rp_state == BLUR_STATE_ONLINE_LOBBY) || (rp_state == BLUR_STATE_PRIVATE_LOBBY)) {
 		//playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST_PRIVATE, OFFSETS_BLUR_PLAYLIST_PRIVATE);
-		playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST, OFFSETS_BLUR_PLAYLIST); //TODO NOTE: for me, this one is [always] correct (?)
-	} else {
-		sprintf_s(sz_playlist, len_playlist, "");
-		sprintf_s(sz_small_img_key, len_small_img_key, "");
-		return;
+		uintptr_t ptr = follow_offsets(ADDY_BLUR_PLAYLIST, OFFSETS_BLUR_PLAYLIST); //TODO NOTE: for me, this one is [always] correct (?)
+		if (ptr != NULL) playlist_id = *(unsigned int*) ptr;
 	}
 	switch (playlist_id) {
 		case BLUR_PLAYLIST_COMMUNITY_EVENTS:
@@ -235,13 +234,18 @@ void format_state(int rp_state, char* sz_playlist, const size_t len_playlist, ch
 			sprintf_s(sz_small_img_key, len_small_img_key, "custom_game");
 			break;
 
+		case BLUR_PLAYLIST_NONE: // prob means we didnt read a playlist_id
+			sprintf_s(sz_playlist, len_playlist, "");
+			sprintf_s(sz_small_img_key, len_small_img_key, "");
+			break;
+
 		default:
 			sprintf_s(sz_playlist, len_playlist, "Unknown game type: %d", playlist_id);
 			break;
 	}
 }
 
-void format_party(int rp_state, char* party_size, char* party_max, char* party_id, const size_t len_party_id) {
+void format_party(int rp_state, char* party_size, char* party_max, char* sz_party_id, const size_t len_party_id) {
 	// sprintf_s(partyId, length, "12222222");
 	// *partyMax = 20;
 	// *partySize = 1;
@@ -250,19 +254,24 @@ void format_party(int rp_state, char* party_size, char* party_max, char* party_i
 	*party_max = 8; // changed to 8 cause thats what the ingame menu menu says...
 	// find lan values maybe?
 	if (rp_state == BLUR_STATE_ONLINE_LOBBY) {
-		*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_ONLINE);
-		sprintf_s(party_id, len_party_id, "party_id_BLUR_STATE_ONLINE_LOBBY");
+		uintptr_t ptr = follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_ONLINE);
+		if (ptr != NULL) *party_max = *(short*) ptr;
+		sprintf_s(sz_party_id, len_party_id, "party_id_BLUR_STATE_ONLINE_LOBBY");
 	} else if (rp_state == BLUR_STATE_PRIVATE_LOBBY) {
-		*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
+		uintptr_t ptr = follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
+		if (ptr != NULL) *party_max = *(short*) ptr;
 		//*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS_PRIVATE, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
-		sprintf_s(party_id, len_party_id, "party_id_BLUR_STATE_PRIVATE_LOBBY");
+		sprintf_s(sz_party_id, len_party_id, "party_id_BLUR_STATE_PRIVATE_LOBBY");
 	} else {
-		sprintf_s(party_id, len_party_id, "");
+		// if there is no sz_party_id, does that mean the game wont print anything?
+		// cause if that is the case, calculationg party_size is redundant
+		sprintf_s(sz_party_id, len_party_id, "");
 		return;
 	}
 
 	//works when user is actually in party. (even if solo party @ 1/8)
-	*party_size = *(char*) follow_offsets(ADDY_BLUR_PARTY_N_PLAYERS, OFFSETS_BLUR_PARTY_N_PLAYERS);
+	uintptr_t ptr = follow_offsets(ADDY_BLUR_PARTY_N_PLAYERS, OFFSETS_BLUR_PARTY_N_PLAYERS);
+	if (ptr != NULL) *party_size = *(char*) ptr;
 	//*party_size = 0; //still need to test this one
 }
 
