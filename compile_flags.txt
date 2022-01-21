@@ -1,0 +1,17 @@
+-xc++
+--target=i686-pc-windows-msvc
+-Wall
+-fms-compatibility
+-shared
+-o
+build\blur_rpc.asi
+
+-I
+include
+
+src\blur_rpc.cpp
+
+-L
+lib
+-l
+discord-rpc

@@ -1,352 +1,362 @@
-#include <ctime>
-#include <stdio.h>
-#include <windows.h>
-#include <discord_rpc.h>
-#include <vector>
-#include <inttypes.h>
-#include <stdint.h>
+#include <ctime> // time() func
+#include <string>
+//#include <inttypes.h>
+//#include <stdint.h>
+//#include <vadefs.h>
+
+extern "C" {
+	#include "discord_rpc.h"
+	#include "discord_register.h"
+}
+#include "blur_rpc.h"
+#include "config.h"
+
+
+//DEBUG STUFF: TODO RM ME
+//#include <Windows.h> // OutputDebugString()
 #include <iostream>
-#include <ctime>
+#include <fstream>
+//#include <stdio.h>
+//IDK
 
-#include <config.h>
 
-using namespace std;
+/*
+static void format_state (char* state, char length) {
+	if (*C_CAR_PTR < 0) {
+		state[0] = 0;
+		return;
+	}
+	const int car_addr = (*CARS_ADDR_PTR + (*C_CAR_PTR * 0x890));
+	const char* const car_name = (char*)(car_addr + 0x20);
+	const auto car_itr = CAR_TABLE.find(car_name);
+	if (car_itr != CAR_TABLE.end()) {
+		sprintf_s(state, length, "%s", car_itr->second);
+	} else {
+		const char* const car_brand = (char*)(car_addr + 0xC0);
+		sprintf_s(state, length, "%s %s", car_brand, car_name);
+	}
+}
+*/
 
-#define C_RP_STATUS_PTR 0x00D5F39C
 
-uintptr_t FindDMAAddy(uintptr_t ptr, std::vector<unsigned int> offsets)
-{
-
-  uintptr_t moduleBase = (uintptr_t)GetModuleHandle(NULL);
-  uintptr_t addr = moduleBase + ptr;
-  for (unsigned int i = 0; i < offsets.size(); ++i)
-  {
-
-    addr = *(uintptr_t *)addr;
-
-    addr += offsets[i];
-  }
-
-  return addr;
+// lil logger to debug some errors, maybe RM later
+void log(std::string output) {
+	static std::ofstream log_file("blur_rpc.log");
+	log_file << output << std::endl;
+	log_file.flush();
+	//OutputDebugString(output.c_str());
 }
 
-// static void format_state (char* state, char length) {
-//   if (*C_CAR_PTR < 0) {
-//     state[0] = 0;
-//     return;
-//   }
 
-//   const int car_addr = (*CARS_ADDR_PTR + (*C_CAR_PTR * 0x890));
-//   const char* const car_name = (char*)(car_addr + 0x20);
-
-//   const auto car_itr = CAR_TABLE.find(car_name);
-//   if (car_itr != CAR_TABLE.end()) {
-//     sprintf_s(state, length, "%s", car_itr->second);
-//   } else {
-//     const char* const car_brand = (char*)(car_addr + 0xC0);
-//     sprintf_s(state, length, "%s %s", car_brand, car_name);
-//   }
-// }
-
-static void format_details(unsigned int *rp_state, char *details, char length)
-{
-
-  uintptr_t ptr2 = 0x00CE6B60;
-  uintptr_t ammoAddr2 = FindDMAAddy(ptr2, {4});
-  unsigned int test = *(uintptr_t *)ammoAddr2;
-  *rp_state = test;
-  switch (test)
-  {
-  case 0:
-    sprintf_s(details, length, "Main menu");
-    break;
-  case 1:
-    sprintf_s(details, length, "Main menu");
-    break;
-  case 2:
-    sprintf_s(details, length, "Stickers");
-    break;
-  case 3:
-    sprintf_s(details, length, "Leaderboards");
-    break;
-  case 4:
-    sprintf_s(details, length, "Reading help");
-    break;
-  case 5:
-    sprintf_s(details, length, "Garage");
-    break;
-  case 7:
-    sprintf_s(details, length, "Singleplayer");
-    break;
-  case 8:
-    sprintf_s(details, length, "Photos (singleplayer)");
-    break;
-  case 9:
-    sprintf_s(details, length, "Friends challenges");
-    break;
-  case 10:
-    sprintf_s(details, length, "Career");
-    break;
-  case 12:
-    sprintf_s(details, length, "Multiplayer menu");
-    break;
-  case 14:
-    sprintf_s(details, length, "Race history");
-    break;
-  case 15:
-    sprintf_s(details, length, "In LAN menu");
-    break;
-  case 16:
-    sprintf_s(details, length, "Online menu");
-    break;
-  case 17:
-    sprintf_s(details, length, "In mods menu");
-    break;
-  case 18:
-    sprintf_s(details, length, "Online challenges");
-    break;
-  case 19:
-    sprintf_s(details, length, "In online lobby");
-    break;
-  case 27:
-    sprintf_s(details, length, "In race");
-    break;
-  case 28:
-    sprintf_s(details, length, "In Motor Mash");
-    break;
-  case 29:
-    sprintf_s(details, length, "In private lobby");
-    break;
-  default:
-    sprintf_s(details, length, "Unknown %d", test);
-  }
+// you can make an offset 0 too
+// if you pass an empty vec, you can just just use it to read the start ptr
+uintptr_t follow_offsets(uintptr_t ptr_start, std::vector<uintptr_t> offsets) {
+	uintptr_t moduleBase = (uintptr_t) GetModuleHandle(NULL);
+	uintptr_t addr = moduleBase + ptr_start;
+	for (uintptr_t offset : offsets) {
+		if (addr == NULL) break; // The most basic of checks, but might save us from a few segfaults :: TODO fantastik chek
+		addr = *(uintptr_t*) addr; // TODO consider checking if we are reading some bad mem here?
+		addr += offset;
+	}
+	return addr;
 }
 
-static void format_state_2(unsigned int* game_type,char* state, char length,char* smallLogo, char smallLogoLength) //when 1 is not enough
-{
-      switch (*game_type)
-    {
-    case 24392580:
-      sprintf_s(state, length, "Community Events");
-      sprintf_s(smallLogo, smallLogoLength, "community_events");
-      break;
-    case 2288498497:
-      sprintf_s(state, length, "Team Racing");
-      sprintf_s(smallLogo, smallLogoLength, "team_racing");
-      break;
-    case 2366728894:
-      sprintf_s(state, length, "Team Motor Mash");
-      sprintf_s(smallLogo, smallLogoLength, "team_motor_mash");
-      break;
-    case 3468808035:
-      sprintf_s(state, length, "Motor mash");
-      sprintf_s(smallLogo, smallLogoLength, "motor_mash");
-      break;
-    case 1527855959:
-      sprintf_s(state, length, "World Tour");
-      sprintf_s(smallLogo, smallLogoLength, "world_tour");
-      break;
-    case 3131866246:
-      sprintf_s(state, length, "Hardcore Racing");
-      sprintf_s(smallLogo, smallLogoLength, "hardcore");
-      break;
-    case 1647796835:
-      sprintf_s(state, length, "Powered-up racing");
-      sprintf_s(smallLogo, smallLogoLength, "powered_up_racing");
-      break;
-    case 1786934394:
-      sprintf_s(state, length, "Skirmish racing");
-      sprintf_s(smallLogo, smallLogoLength, "skirmish_racing");
-      break;
-    case 0:
-      sprintf_s(state, length, "Custom game");
-      sprintf_s(smallLogo, smallLogoLength, "custom_game");
-      break;
-    default:
-      sprintf_s(state, length, "Unknown game type - %d", *game_type);
-    }
+
+int get_rp_state() {
+	int rp_state = -1;
+	uintptr_t ptr = follow_offsets(ADDY_BLUR_STATE, OFFSETS_BLUR_STATE);
+	if (ptr != NULL) rp_state = *(uintptr_t*) ptr;
+	return rp_state;
 }
 
-static void format_state(unsigned int* rp_state, char* state, char length,char* smallLogo, char smallLogoLength)
-{
 
-  if (*rp_state == 19)
-  {
+void format_details(int rp_state, char* sz_details, const size_t len) {
+	switch (rp_state) {
+		case BLUR_STATE_MAIN:
+			sprintf_s(sz_details, len, "(Main menu)");
+			break;
 
-    uintptr_t ptr2 = 0xD022F0;
-    uintptr_t moduleBase = (uintptr_t)GetModuleHandle(NULL);
-    uintptr_t addr = moduleBase + ptr2;
-    unsigned int test = *(uintptr_t *)addr;
+		case BLUR_STATE_MENU_MAIN: // what?
+			sprintf_s(sz_details, len, "Main menu");
+			break;
 
-    format_state_2(&test, state ,length,smallLogo,smallLogoLength);
-  }
-  else if (*rp_state == 29)
-  {
-    uintptr_t ptr2 = 0xE35C54;
-    uintptr_t moduleBase = (uintptr_t)GetModuleHandle(NULL);
-    uintptr_t addr = moduleBase + ptr2;
-    unsigned int test = *(uintptr_t *)addr;
+		case BLUR_STATE_MENU_STICKERS:
+			sprintf_s(sz_details, len, "Stickers");
+			break;
 
-   format_state_2(&test, state ,length,smallLogo,smallLogoLength);
+		case BLUR_STATE_MENU_LEADERBOARDS:
+			sprintf_s(sz_details, len, "Leaderboards");
+			break;
 
-  }
-  else
-  {
-    sprintf_s(state, length, "");
-    sprintf_s(smallLogo, smallLogoLength, "");
-  }
+		case BLUR_STATE_MENU_HELP:
+			sprintf_s(sz_details, len, "Reading help");
+			break;
+
+		case BLUR_STATE_GARAGE:
+			sprintf_s(sz_details, len, "Garage");
+			break;
+
+		//
+		case BLUR_STATE_SINGLEPLAYER:
+			sprintf_s(sz_details, len, "Singleplayer");
+			break;
+
+		case BLUR_STATE_PHOTOS:
+			sprintf_s(sz_details, len, "Photos (singleplayer)");
+			break;
+
+		case BLUR_STATE_CHALLENGES_FRIENDS:
+			sprintf_s(sz_details, len, "Friends challenges");
+			break;
+
+		case BLUR_STATE_CAREER:
+			sprintf_s(sz_details, len, "Career");
+			break;
+
+		//
+
+		case BLUR_STATE_MENU_MULTIPLAYER:
+			sprintf_s(sz_details, len, "Multiplayer menu");
+			break;
+
+		//
+
+		case BLUR_STATE_MENU_HISTORY:
+			sprintf_s(sz_details, len, "Race history");
+			break;
+
+		case BLUR_STATE_MENU_LAN:
+			sprintf_s(sz_details, len, "In LAN menu");
+			break;
+
+		case BLUR_STATE_MENU_ONLINE:
+			sprintf_s(sz_details, len, "Online menu");
+			break;
+
+		case BLUR_STATE_MENU_MODS:
+			sprintf_s(sz_details, len, "In mods menu");
+			break;
+
+		case BLUR_STATE_CHALLENGES_ONLINE:
+			sprintf_s(sz_details, len, "Online challenges");
+			break;
+
+		case BLUR_STATE_ONLINE_LOBBY:
+			sprintf_s(sz_details, len, "In online lobby");
+			break;
+
+		//..
+
+		case BLUR_STATE_RACE:
+			sprintf_s(sz_details, len, "In race");
+			break;
+
+		case BLUR_STATE_MOTOR_MASH:
+			sprintf_s(sz_details, len, "In Motor Mash");
+			break;
+
+		case BLUR_STATE_PRIVATE_LOBBY:
+			sprintf_s(sz_details, len, "In private lobby");
+			break;
+
+		default:
+			sprintf_s(sz_details, len, "Unknown %d", rp_state);
+			break;
+	}
 }
 
-static void format_party(unsigned int* rp_state, unsigned int* partySize, unsigned int* partyMax, char* partyId, char length)
-{
 
-  // sprintf_s(partyId, length, "12222222");
-  // *partyMax = 20;
-  // *partySize = 1;
+void format_state(int rp_state, char* sz_playlist, const size_t len_playlist, char* sz_small_img_key, const size_t len_small_img_key) {
+	unsigned int playlist_id = 1;
+	/*
+	if (rp_state == BLUR_STATE_ONLINE_LOBBY) {
+		//playlist_id = *(unsigned int*) ADDY_BLUR_PLAYLIST_ONLINE;
+		//playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST_ONLINE, OFFSETS_BLUR_PLAYLIST_ONLINE);
+	} else if (rp_state == BLUR_STATE_PRIVATE_LOBBY) {
+		//playlist_id = *(unsigned int*) ADDY_BLUR_PLAYLIST_PRIVATE;
+		//playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST_PRIVATE, OFFSETS_BLUR_PLAYLIST_PRIVATE);
+	*/
+	if ((rp_state == BLUR_STATE_ONLINE_LOBBY) || (rp_state == BLUR_STATE_PRIVATE_LOBBY)) {
+		//playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST_PRIVATE, OFFSETS_BLUR_PLAYLIST_PRIVATE);
+		playlist_id = *(unsigned int*) follow_offsets(ADDY_BLUR_PLAYLIST, OFFSETS_BLUR_PLAYLIST); //TODO NOTE: for me, this one is [always] correct (?)
+	} else {
+		sprintf_s(sz_playlist, len_playlist, "");
+		sprintf_s(sz_small_img_key, len_small_img_key, "");
+		return;
+	}
+	switch (playlist_id) {
+		case BLUR_PLAYLIST_COMMUNITY_EVENTS:
+			sprintf_s(sz_playlist, len_playlist, "Community Events");
+			sprintf_s(sz_small_img_key, len_small_img_key, "community_events");
+			break;
 
-  if (*rp_state == 19)
-  {
+		case BLUR_PLAYLIST_TEAM_RACING:
+			sprintf_s(sz_playlist, len_playlist, "Team Racing");
+			sprintf_s(sz_small_img_key, len_small_img_key, "team_racing");
+			break;
 
-    uintptr_t max_players_online_base_ptr = 0x00DEB9C8;
-    uintptr_t max_players_online_ptr = FindDMAAddy(max_players_online_base_ptr, {188});
+		case BLUR_PLAYLIST_TEAM_MOTOR_MASH:
+			sprintf_s(sz_playlist, len_playlist, "Team Motor Mash");
+			sprintf_s(sz_small_img_key, len_small_img_key, "team_motor_mash");
+			break;
 
-    uintptr_t current_players_online_base_ptr = 0x00DB4530;
-    uintptr_t current_players_online_ptr = FindDMAAddy(current_players_online_base_ptr, {20});
+		case BLUR_PLAYLIST_MOTOR_MASH:
+			sprintf_s(sz_playlist, len_playlist, "Motor mash");
+			sprintf_s(sz_small_img_key, len_small_img_key, "motor_mash");
+			break;
 
-    unsigned int max_players = *(uintptr_t *)max_players_online_ptr;
-    unsigned int current_players = *(uintptr_t *)current_players_online_ptr;
-    sprintf_s(partyId, length, "1111111111111111111111111111111111111112");
-    *partyMax = 0;
-    *partySize = 0; //still need to test this one
-  }
-  else if (*rp_state == 29)
-  {
+		case BLUR_PLAYLIST_WORLD_TOUR:
+			sprintf_s(sz_playlist, len_playlist, "World Tour");
+			sprintf_s(sz_small_img_key, len_small_img_key, "world_tour");
+			break;
 
-    uintptr_t max_players_private_base_ptr = 0x00DB4548;
-    uintptr_t max_players_private_ptr = FindDMAAddy(max_players_private_base_ptr, {18});
+		case BLUR_PLAYLIST_HARDCORE:
+			sprintf_s(sz_playlist, len_playlist, "Hardcore Racing");
+			sprintf_s(sz_small_img_key, len_small_img_key, "hardcore");
+			break;
 
-    uintptr_t current_players_online_base_ptr = 0x00DB4530;
-    uintptr_t current_players_online_ptr = FindDMAAddy(current_players_online_base_ptr, {20});
+		case BLUR_PLAYLIST_POWERED_UP_RACING:
+			sprintf_s(sz_playlist, len_playlist, "Powered-up racing");
+			sprintf_s(sz_small_img_key, len_small_img_key, "powered_up_racing");
+			break;
 
-    unsigned int max_players = *(uintptr_t *)max_players_private_ptr;
-    unsigned int current_players = *(uintptr_t *)current_players_online_ptr;
-    sprintf_s(partyId, length, "1111111111111111111111111111111111111112");
+		case BLUR_PLAYLIST_SKIRMISH_RACING:
+			sprintf_s(sz_playlist, len_playlist, "Skirmish racing");
+			sprintf_s(sz_small_img_key, len_small_img_key, "skirmish_racing");
+			break;
 
-    *partyMax = 0;
-    *partySize = 0;
-  }
-  else
-  {
-    sprintf_s(partyId, length, "");
-    *partyMax = 0;
-    *partySize = 0;
-  }
+		case BLUR_PLAYLIST_DRIVING_SCHOOL:
+			sprintf_s(sz_playlist, len_playlist, "Driving school");
+			sprintf_s(sz_small_img_key, len_small_img_key, "driving_school");
+			break;
+
+		case BLUR_PLAYLIST_CUSTOM_GAME:
+			sprintf_s(sz_playlist, len_playlist, "Custom game");
+			sprintf_s(sz_small_img_key, len_small_img_key, "custom_game");
+			break;
+
+		default:
+			sprintf_s(sz_playlist, len_playlist, "Unknown game type: %d", playlist_id);
+			break;
+	}
 }
 
-static void format_time(unsigned int* rp_state, uint64_t* racetime, bool* timeDisplayed)
-{
+void format_party(int rp_state, char* party_size, char* party_max, char* party_id, const size_t len_party_id) {
+	// sprintf_s(partyId, length, "12222222");
+	// *partyMax = 20;
+	// *partySize = 1;
+	//FIXME changed offsets, revise on other clients
+	// TODO revise!
+	*party_max = 8; // changed to 8 cause thats what the ingame menu menu says...
+	// find lan values maybe?
+	if (rp_state == BLUR_STATE_ONLINE_LOBBY) {
+		*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_ONLINE);
+		sprintf_s(party_id, len_party_id, "party_id_BLUR_STATE_ONLINE_LOBBY");
+	} else if (rp_state == BLUR_STATE_PRIVATE_LOBBY) {
+		*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
+		//*party_max = *(short*) follow_offsets(ADDY_BLUR_PARTY_MAX_PLAYERS_PRIVATE, OFFSETS_BLUR_PARTY_MAX_PLAYERS_PRIVATE);
+		sprintf_s(party_id, len_party_id, "party_id_BLUR_STATE_PRIVATE_LOBBY");
+	} else {
+		sprintf_s(party_id, len_party_id, "");
+		return;
+	}
 
-  if (*timeDisplayed == false)
-  {
-    if (*rp_state == 27 || *rp_state == 28)
-    {
-      *racetime = time(0);
-      *timeDisplayed = true;
-    }
-    else if (*rp_state == 19 || *rp_state == 29)
-    {
-      *racetime = time(0);
-      *timeDisplayed = true;
-    } else {
-      *racetime = 0;
-    }
-  }
-  else
-  {
-
-    // wchar_t buffer[255];
-    // wsprintfW(buffer, L"%d", *rp_state);
-
-    // MessageBoxW(nullptr, buffer, buffer, MB_ICONWARNING);
-
-    if (*rp_state == 27U || *rp_state == 28U || *rp_state == 19U || *rp_state == 29U)
-    {
-      //honestly, I have no idea why it fails if I use !=. tobii, pls fix!
-    } else {
-      *racetime = 0;
-      *timeDisplayed = false;
-    }
-  }
+	//works when user is actually in party. (even if solo party @ 1/8)
+	*party_size = *(char*) follow_offsets(ADDY_BLUR_PARTY_N_PLAYERS, OFFSETS_BLUR_PARTY_N_PLAYERS);
+	//*party_size = 0; //still need to test this one
 }
 
-static DWORD WINAPI ThreadEntry(LPVOID lpParam)
-{
 
-  char state[64];
-  char details[64];
-  unsigned int rp_state;
-  unsigned int partySize;
-  unsigned int partyMax;
-  char smallLogo[64];
-  char partyId[64];
-  uint64_t racetime;
-  bool timeDisplayed = false;
+void format_time(int rp_state, int64_t* start_time) {
+	//TODO I dont think this is right but I don't know anything...
+	//// //honestly, I have no idea why it fails if I use !=. tobii, pls fix!
+	// im keeping this comment for happy purposes later :D
+	//if (!((*rp_state == 27U) || (*rp_state == 28U) || (*rp_state == 19U) || (*rp_state == 29U)))
+	static int prev_state = rp_state;
+	if (rp_state != prev_state) { // we just changed states, maybe we have to start (or remove) the timer
+		if ((rp_state == BLUR_STATE_ONLINE_LOBBY) || (rp_state == BLUR_STATE_PRIVATE_LOBBY)) {
+			// we just entered this lobby or something, maybe we can display the amount of time that the user has been waiting in this lobby
+			*start_time = time(0);
+		} else if ((rp_state == BLUR_STATE_RACE) || (rp_state == BLUR_STATE_MOTOR_MASH)) {
+			// we just entered this race or something, we can display the amount of time that the user has been racing
+			*start_time = time(0);
 
-  Discord_Initialize(APP_ID, 0, 0, 0);
-
-  DiscordRichPresence discord_presence;
-  memset(&discord_presence, 0, sizeof(discord_presence));
-
-
-
-
-  // discord_presence.matchSecret = "4b2fdce12f639de8bfa7e3591b71a0d679d7c93f";
-  // discord_presence.spectateSecret = "e7eb30d2ee025ed05c71ea495f770b76454ee4e0";
-
-  // sprintf_s(partyId, sizeof(partyId), "12222222");
-  // partyMax = 20;
-  // partySize = 1;
-  //racetime = time(0);
-
-  Sleep(1000);
-  while (1)
-  {
-    format_details(&rp_state, details, sizeof(details));
-    format_state(&rp_state,state, sizeof(state), smallLogo , sizeof(smallLogo));
-    format_party(&rp_state, &partySize, &partyMax, partyId, sizeof(partyId));
-    format_time(&rp_state, &racetime, &timeDisplayed);
-
-    discord_presence.state = state;
-    discord_presence.details = details;
-    discord_presence.smallImageKey = smallLogo;
-    discord_presence.smallImageText = details;
-    discord_presence.largeImageKey = "logo";
-    discord_presence.largeImageText = "Blur";
-    discord_presence.partyId = partyId;
-    discord_presence.partySize = partySize;
-    discord_presence.partyMax = partyMax;
-    discord_presence.startTimestamp = racetime;
-
-    Discord_UpdatePresence(&discord_presence);
-    Discord_RunCallbacks();
-    Sleep(UPD_INTVL);
-  }
+		} else if (rp_state == BLUR_STATE_CAREER) {
+			// we could come up with other things that we might want to display elapsed time for?
+			*start_time = time(0);
+		} else {
+			*start_time = 0; // nothing, dont display
+		}
+		log("rp_state: " + std::to_string(prev_state) + " -> " + std::to_string(rp_state) + " @ " + std::to_string(*start_time));
+	}
+	prev_state = rp_state;
 }
 
-extern "C" __declspec(dllexport)
-    BOOL APIENTRY DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
-{
-  switch (fdwReason)
-  {
-  case DLL_PROCESS_ATTACH:
-    Discord_Shutdown();
-    DisableThreadLibraryCalls(hinstDLL);
-    CreateThread(0, 0, ThreadEntry, 0, 0, 0);
-    break;
-  case DLL_PROCESS_DETACH:
-    Discord_Shutdown();
-    break;
-  }
 
-  return 1;
+static DWORD WINAPI ThreadEntry(LPVOID lpParam) {
+	unsigned int rp_state = NULL;
+	char sz_playlist[LEN_STATE_BUFFER] = "";
+	char sz_details[LEN_DETAILS_BUFFER] = "";
+	char party_size = 0;
+	char party_max = 0;
+	char sz_small_img_key[LEN_IMG_KEY_BUFFER];
+	char party_id[LEN_PARTY_ID_BUFFER];
+	int64_t start_time = 0;
+
+	Discord_Initialize(APP_ID, 0, 0, 0);
+
+	DiscordRichPresence dp;
+	memset(&dp, 0, sizeof(dp));
+
+	// discord_presence.matchSecret = "4b2fdce12f639de8bfa7e3591b71a0d679d7c93f";
+	// discord_presence.spectateSecret = "e7eb30d2ee025ed05c71ea495f770b76454ee4e0";
+
+	// sprintf_s(partyId, sizeof(partyId), "12222222");
+	// partyMax = 20;
+	// partySize = 1;
+	//racetime = time(0);
+	
+	log("[blur_rpc] LOADED");
+	do {
+		Sleep(UPD_INTVL);
+		if ((rp_state = get_rp_state()) != -1) {
+			format_details(rp_state, sz_details, sizeof(sz_details)); // What is the user doing? (Menu / Race / Career / ... )
+			format_state(rp_state, sz_playlist, sizeof(sz_playlist), sz_small_img_key, sizeof(sz_small_img_key)); // What playlist is the user playing? (Skirmish / Team / ... )
+			format_party(rp_state, &party_size, &party_max, party_id, sizeof(party_id)); // How many other players? ( <party> / 20 )
+			format_time(rp_state, &start_time); // How long has the user been doing that?
+
+			dp.state = sz_playlist;
+			dp.details = sz_details;
+			dp.smallImageKey = sz_small_img_key;
+			dp.smallImageText = sz_details;
+			dp.largeImageKey = "logo";
+			dp.largeImageText = "Blur";
+			dp.partyId = party_id;
+			dp.partySize = party_size;
+			dp.partyMax = party_max;
+			dp.startTimestamp = start_time;
+
+			Discord_UpdatePresence(&dp);
+			Discord_RunCallbacks(); // might crash if it cant find them?
+		} else {
+			log("[blur_rpc] Not updating RP because rp_state = " + std::to_string(rp_state));
+		}
+	} while (true);
+	//TODO set hooks that tell us to upadte, instead of running this in a loop
+}
+
+extern "C" __declspec(dllexport) BOOL APIENTRY DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
+	switch (fdwReason) {
+		case DLL_PROCESS_ATTACH:
+			Discord_Shutdown(); //TODO why?
+			DisableThreadLibraryCalls(hinstDLL);
+			CreateThread(0, 0, ThreadEntry, 0, 0, 0);
+			break;
+
+		case DLL_PROCESS_DETACH:
+			log("[blur_rpc] Shutting down!");
+			Discord_Shutdown();
+			break;
+	}
+	return TRUE;
 }
